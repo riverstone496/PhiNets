@@ -1,10 +1,6 @@
 import os
 import torch
-import torch.nn as nn
 import torch.nn.functional as F 
-import torchvision
-import numpy as np
-from tqdm import tqdm
 from utils import *
 from arguments import get_args
 from augmentations import get_aug
@@ -16,12 +12,6 @@ from linear_eval import main as linear_eval
 import argparse
 import wandb
 from tools.weight_comp import calculate_similarity
-# start a new wandb run to track this script
-
-def stable_rank(matrix):
-    frobenius_norm = torch.norm(matrix, p='fro')
-    operator_norm = torch.linalg.norm(matrix, ord=2)
-    return  (frobenius_norm / operator_norm) **2
 
 def main(device, args):
     train_loader = torch.utils.data.DataLoader(
@@ -128,29 +118,6 @@ def main(device, args):
                 #    slow_accuracy = knn_monitor(model.module.slow_encoder, memory_loader, test_loader, epoch, k=min(args.train.knn_k, len(memory_loader.dataset)), hide_progress=args.hide_progress, device=args.device) 
                 #log_dict['slow_acc']=slow_accuracy
             wandb.log(log_dict)
-        if args.log_rank:
-            pred1 = model.module.predictor.layer1[0].weight.data
-            pred2 = model.module.predictor.layer2.weight.data
-            dec1 = model.module.decoder.layer1[0].weight.data
-            dec2 = model.module.decoder.layer2.weight.data
-            wandb.log({
-                "epoch":epoch,
-                "rank/pred1":stable_rank(pred1),
-                "rank/pred2":stable_rank(pred2),
-                "rank/dec1":stable_rank(dec1),
-                "rank/dec2":stable_rank(dec2),
-                "rank/pred":stable_rank(pred2@pred1),
-                "rank/dec":stable_rank(dec2@dec1),
-                "diag_ratio/pred1":torch.sum(torch.abs(torch.diag(pred1))) / torch.sum(torch.abs(pred1)),
-                "diag_ratio/pred2":torch.sum(torch.abs(torch.diag(pred2))) / torch.sum(torch.abs(pred2)),
-                "diag_ratio/dec1":torch.sum(torch.abs(torch.diag(dec1))) / torch.sum(torch.abs(dec1)),
-                "diag_ratio/dec2":torch.sum(torch.abs(torch.diag(dec2))) / torch.sum(torch.abs(dec2)),
-                "diag_ratio/pred":torch.sum(torch.abs(torch.diag(pred2@pred1))) / torch.sum(torch.abs(pred2@pred1)),
-                "diag_ratio/dec":torch.sum(torch.abs(torch.diag(dec2@dec1))) / torch.sum(torch.abs(dec2@dec1)),
-            })
-        #epoch_dict = {"epoch":epoch, "accuracy":accuracy}
-        #global_progress.set_postfix(epoch_dict)
-        #logger.update_scalers(epoch_dict)
         state_dict=model.module.state_dict()
         if args.dataset_name=='cifar5m' and (not args.eval_last):
             linear_eval(args, state_dict, global_epoch=epoch)
@@ -201,7 +168,6 @@ if __name__ == "__main__":
     
     parser.add_argument('--use_timm', action='store_true', default=False)
     parser.add_argument('--pretrained', action='store_true', default=False)
-    parser.add_argument('--log_rank', action='store_true', default=False)
     parser.add_argument('--eval_last', action='store_true', default=False)
     
     args = parser.parse_args()
