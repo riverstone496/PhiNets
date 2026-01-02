@@ -1,13 +1,6 @@
 from .simsiam import SimSiam
-from .simsiamTWD import SimSiamTWD
-from .simsiam_rank1 import SimSiamRank1
-from .hiposiam import HipoSiam
-from .hiposiampred import HipoSiamPred
-from .hiposiamlatent import HipoSiamLatent
 from .trisiam import TriSiamLatent
-from .sidae import SidAE
 from .phinet import PhiNet
-from .recphinet import RecPhiNet
 from .eyephinet import EyePhiNet
 from .phinet_mom import PhiNetMom
 from .phinet_mom_cos import PhiNetMomCos
@@ -46,18 +39,6 @@ def get_model(model_cfg,simplicial_model='DCT'):
         model =  SimSiam(get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained))
         if model_cfg.proj_layers is not None:
             model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'hiposiam':
-        model =  HipoSiam(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained))
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'hiposiampred':
-        model =  HipoSiamPred(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained))
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'hiposiamlatent' or 'hiposiamlatent' in model_cfg.model_name:
-        model =  HipoSiamLatent(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained), mse_loss_ratio=model_cfg.mse_loss_ratio, ori_loss_ratio = model_cfg.ori_loss_ratio)
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
     elif model_cfg.model_name == 'phinet':
         model =  PhiNet(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained), mse_loss_ratio=model_cfg.mse_loss_ratio, ori_loss_ratio = model_cfg.ori_loss_ratio)
         if model_cfg.proj_layers is not None:
@@ -72,10 +53,6 @@ def get_model(model_cfg,simplicial_model='DCT'):
             model.projector.set_layers(model_cfg.proj_layers)
     elif model_cfg.model_name == 'eyephinet':
         model =  EyePhiNet(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained), mse_loss_ratio=model_cfg.mse_loss_ratio, ori_loss_ratio = model_cfg.ori_loss_ratio)
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'recphinet':
-        model =  RecPhiNet(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained), mse_loss_ratio=model_cfg.mse_loss_ratio, ori_loss_ratio = model_cfg.ori_loss_ratio)
         if model_cfg.proj_layers is not None:
             model.projector.set_layers(model_cfg.proj_layers)
     elif model_cfg.model_name == 'phinetmom':
@@ -110,20 +87,6 @@ def get_model(model_cfg,simplicial_model='DCT'):
         model =  TriSiamLatent(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained), mse_loss_ratio=model_cfg.mse_loss_ratio, ori_loss_ratio = model_cfg.ori_loss_ratio)
         if model_cfg.proj_layers is not None:
             model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'sidae':
-        model =  SidAE(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained))
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'simsiamTWD':
-        model =  SimSiamTWD(backbone=get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained),simplicial_model=simplicial_model)
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'simsiamrank1':
-        model =  SimSiamRank1(get_backbone(model_cfg.backbone, use_timm=model_cfg.use_timm, pretrained = model_cfg.pretrained))
-        if model_cfg.proj_layers is not None:
-            model.projector.set_layers(model_cfg.proj_layers)
-    elif model_cfg.model_name == 'swav':
-        raise NotImplementedError
     else:
         raise NotImplementedError
     return model
