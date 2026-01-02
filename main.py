@@ -171,10 +171,6 @@ if __name__ == "__main__":
     parser.add_argument('--eval_last', action='store_true', default=False)
     
     args = parser.parse_args()
-    if args.model_name == 'simsiam':
-        args.model_name = 'hiposiamlatent'
-        args.mse_loss_ratio = 0
-        args.ori_loss_ratio = 0
     args_out = get_args(args)
     wandb.init(
     # set the wandb project where this run will be logged
