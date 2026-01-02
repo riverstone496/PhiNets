@@ -1,0 +1,210 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F 
+from torchvision.models import resnet50
+
+
+def D_nsg(p, z, version='simplified'): # negative cosine similarity
+    if version == 'original':
+        #z = z.detach() # stop gradient
+        p = F.normalize(p, dim=1) # l2-normalize 
+        z = F.normalize(z, dim=1) # l2-normalize 
+        return -(p*z).sum(dim=1).mean()
+
+    elif version == 'simplified':# same thing, much faster. Scroll down, speed test in __main__
+        return - F.cosine_similarity(p, z, dim=-1).mean()
+    else:
+        raise Exception
+
+def D(p, z, version='simplified'): # negative cosine similarity
+    if version == 'original':
+        z = z.detach() # stop gradient
+        p = F.normalize(p, dim=1) # l2-normalize 
+        z = F.normalize(z, dim=1) # l2-normalize 
+        return -(p*z).sum(dim=1).mean()
+
+    elif version == 'simplified':# same thing, much faster. Scroll down, speed test in __main__
+        return - F.cosine_similarity(p, z.detach(), dim=-1).mean()
+    else:
+        raise Exception
+
+class projection_MLP(nn.Module):
+    def __init__(self, in_dim, hidden_dim=2048, out_dim=2048):
+        super().__init__()
+        ''' page 3 baseline setting
+        Projection MLP. The projection MLP (in f) has BN ap-
+        plied to each fully-connected (fc) layer, including its out- 
+        put fc. Its output fc has no ReLU. The hidden fc is 2048-d. 
+        This MLP has 3 layers.
+        '''
+        self.layer1 = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.layer2 = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.layer3 = nn.Sequential(
+            nn.Linear(hidden_dim, out_dim),
+            nn.BatchNorm1d(hidden_dim)
+        )
+        self.num_layers = 3
+    def set_layers(self, num_layers):
+        self.num_layers = num_layers
+
+    def forward(self, x):
+        if self.num_layers == 3:
+            x = self.layer1(x)
+            x = self.layer2(x)
+            x = self.layer3(x)
+        elif self.num_layers == 2:
+            x = self.layer1(x)
+            x = self.layer3(x)
+        else:
+            raise Exception
+        return x 
+
+class decoder_MLP(nn.Module):
+    def __init__(self, in_dim=2048, hidden_dim=512, out_dim=2048): # bottleneck structure
+        super().__init__()
+        ''' page 3 baseline setting
+        Prediction MLP. The prediction MLP (h) has BN applied 
+        to its hidden fc layers. Its output fc does not have BN
+        (ablation in Sec. 4.4) or ReLU. This MLP has 2 layers. 
+        The dimension of h’s input and output (z and p) is d = 2048, 
+        and h’s hidden layer’s dimension is 512, making h a 
+        bottleneck structure (ablation in supplement). 
+        '''
+        self.layer1 = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.layer2 = nn.Linear(hidden_dim, out_dim)
+        """
+        Adding BN to the output of the prediction MLP h does not work
+        well (Table 3d). We find that this is not about collapsing. 
+        The training is unstable and the loss oscillates.
+        """
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.layer2(x)
+        return x
+
+class prediction_MLP(nn.Module):
+    def __init__(self, in_dim=2048, hidden_dim=512, out_dim=2048): # bottleneck structure
+        super().__init__()
+        ''' page 3 baseline setting
+        Prediction MLP. The prediction MLP (h) has BN applied 
+        to its hidden fc layers. Its output fc does not have BN
+        (ablation in Sec. 4.4) or ReLU. This MLP has 2 layers. 
+        The dimension of h’s input and output (z and p) is d = 2048, 
+        and h’s hidden layer’s dimension is 512, making h a 
+        bottleneck structure (ablation in supplement). 
+        '''
+        self.layer1 = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.layer2 = nn.Linear(hidden_dim, out_dim)
+        """
+        Adding BN to the output of the prediction MLP h does not work
+        well (Table 3d). We find that this is not about collapsing. 
+        The training is unstable and the loss oscillates.
+        """
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.layer2(x)
+        return x 
+
+class TriSiamLatent(nn.Module):
+    def __init__(self, backbone=resnet50(), mse_loss_ratio = 1, ori_loss_ratio=0):
+        super().__init__()
+        
+        self.backbone = backbone
+        self.projector = projection_MLP(backbone.output_dim)
+        self.decoder = decoder_MLP()
+        self.encoder = nn.Sequential( # f encoder
+            self.backbone,
+            self.projector
+        )
+        self.predictor = prediction_MLP()
+        self.mse_loss_ratio = mse_loss_ratio
+        self.ori_loss_ratio = ori_loss_ratio
+    
+    def forward(self, x1, x2,x_ori):
+
+        f, h, g = self.encoder, self.predictor, self.decoder
+        z1, z2, z_ori = f(x1), f(x2), f(x_ori)
+        p1, p2, p_ori = h(z1), h(z2), h(z_ori)
+        y1, y2, y_ori = g(p1), g(p2), g(p_ori)
+        mseloss = nn.MSELoss()
+
+        L_sim = D(p1, z2) / 2 + D(p2,z1)/2
+        L_sim_ori = D(p1, z_ori) / 2 + D(p2, z_ori)/2
+        L_mse = mseloss(y1, z_ori.detach())/2 + mseloss(y2,z_ori.detach())/2
+        #L_mse = D(y1, z_ori)/2 + D(y2,z_ori)/2 #HipoSiamLatent
+        #L_sim = mseloss(p1,z_ori.detach())/2 + mseloss(p2,z_ori.detach())/2
+        #L_sim = D(p1, z_ori) / 2 + D(p2,z_ori) 
+        #L_sim = D_nsg(p1, z2) / 2 + D_nsg(p2, z1) / 2
+        #L_mse = mseloss(x_ori,y1)/2 + mseloss(x_ori,y2)
+        if self.mse_loss_ratio==0 and self.ori_loss_ratio==0:
+            L = L_sim 
+        elif self.mse_loss_ratio==0 and self.ori_loss_ratio==1:
+            L = L_sim +  L_sim_ori
+        elif self.mse_loss_ratio==1 and self.ori_loss_ratio==0:
+            L = L_sim +  L_mse 
+        elif self.mse_loss_ratio==1 and self.ori_loss_ratio==1:
+            L = L_sim +  L_mse +  L_sim_ori
+        else:
+            L = L_sim + self.mse_loss_ratio  * L_mse + self.ori_loss_ratio  * L_sim_ori
+        return {'loss': L, 'loss_cos': L_sim, 'loss_mse': L_mse, 'L_sim_ori' : L_sim_ori}
+
+
+
+
+
+
+if __name__ == "__main__":
+    model = TriSiamLatent()
+    x1 = torch.randn((2, 3, 224, 224))
+    x2 = torch.randn_like(x1)
+
+    model.forward(x1, x2).backward()
+    print("forward backwork check")
+
+    z1 = torch.randn((200, 2560))
+    z2 = torch.randn_like(z1)
+    import time
+    tic = time.time()
+    print(D(z1, z2, version='original'))
+    toc = time.time()
+    print(toc - tic)
+    tic = time.time()
+    print(D(z1, z2, version='simplified'))
+    toc = time.time()
+    print(toc - tic)
+
+# Output:
+# tensor(-0.0010)
+# 0.005159854888916016
+# tensor(-0.0010)
+# 0.0014872550964355469
+
+
+
+
+
+
+
+
+
+
+
+
