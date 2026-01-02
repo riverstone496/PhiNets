@@ -5,7 +5,7 @@ import torch
 from .lr_scheduler import LR_Scheduler
 from .lion import Lion
 
-def get_optimizer(name, model, lr, momentum, weight_decay, beta2=0.95, preconditioning_compute_steps=30, train_eps=1e-8):
+def get_optimizer(name, model, lr, momentum, weight_decay, beta2=0.95, train_eps=1e-8):
 
     predictor_prefix = ('module.predictor', 'predictor')
     parameters = [{

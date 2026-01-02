@@ -53,7 +53,6 @@ def main(device, args):
         lr=args.train_base_lr*args.train_batch_size*args.accumulation_steps/256, 
         momentum=args.train.optimizer.momentum,
         weight_decay=args.train_weight_decay,
-        preconditioning_compute_steps=args.preconditioning_compute_steps,
         beta2=args.train_beta2,
         train_eps=args.train_eps)
 
@@ -159,7 +158,6 @@ if __name__ == "__main__":
     parser.add_argument('--train_epochs', type=int, default=800)
     parser.add_argument('--train_warmup_epochs', type=float, default=10)
     parser.add_argument('--seed',type=int, default=1234)
-    parser.add_argument('--preconditioning_compute_steps', type=int, default=30)
     parser.add_argument('--eval_num_epochs', type=int, default=100)
     parser.add_argument('--accumulation_steps', type=int, default=1)
 
